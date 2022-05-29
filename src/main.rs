@@ -21,10 +21,8 @@ async fn main() {
   }
 }
 
-unsafe fn run_compute_shader_glsl() {
-  const SOURCE_BYTES: &[u8] = include_bytes!("../resources/shader.comp");
-
-  let mut source_gl = SOURCE_BYTES.to_vec();
+unsafe fn compile_compute_shader(source: &[u8]) -> Result<GLuint, ()> {
+  let mut source_gl = source.to_vec();
 
   source_gl.push(0);  // null-termination
 
@@ -52,7 +50,7 @@ unsafe fn run_compute_shader_glsl() {
 
     println!("ERR: {:?}", CStr::from_ptr(log_buf.as_ptr()));
 
-    return;
+    return Err(());
   }
 
   let program = glCreateProgram();
@@ -77,26 +75,39 @@ unsafe fn run_compute_shader_glsl() {
 
     println!("ERR: {:?}", CStr::from_ptr(log_buf.as_ptr()));
 
-    return;
+    return Err(());
   }
 
+  Ok(program)
+}
+
+unsafe fn run_compute_shader<T>(program: GLuint, default: T, layout: (usize, usize, usize)) -> T
+  where T: Sized + Copy
+{
   glUseProgram(program);
   let mut ssbo = 0;
+  let mut ssbo_data = default;
   glGenBuffers(1, &mut ssbo);
   glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 0, ssbo);
-  glBufferData(GL_SHADER_STORAGE_BUFFER, size_of::<GLuint>() as _, 0u32 as _, GL_DYNAMIC_DRAW);
 
-  glDispatchCompute(1, 1, 1);
+  glBufferData(
+    GL_SHADER_STORAGE_BUFFER,
+    size_of::<T>() as _,
+    &ssbo_data as *const T as _,
+    GL_DYNAMIC_DRAW,
+  );
+
+  glDispatchCompute(layout.0 as _, layout.1 as _, layout.2 as _);
   glMemoryBarrier(GL_SHADER_STORAGE_BARRIER_BIT);
   glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 0, 0);
 
   glBindBuffer(GL_SHADER_STORAGE_BUFFER, ssbo);
 
-  let ptr = glMapBuffer(GL_SHADER_STORAGE_BUFFER, GL_READ_ONLY) as *const GLuint;
-
-  println!("{}", ptr.read());
+  ssbo_data = *(glMapBuffer(GL_SHADER_STORAGE_BUFFER, GL_READ_ONLY) as *const T);
 
   glUnmapBuffer(GL_SHADER_STORAGE_BUFFER);
+
+  ssbo_data
 }
 
 // Using the macro for the main function makes code-completion not work for that function,
@@ -104,7 +115,11 @@ unsafe fn run_compute_shader_glsl() {
 async unsafe fn _main() {
   const NOTO_SANS: &[u8] = include_bytes!("/usr/share/fonts/noto/NotoSans-Regular.ttf");
 
-  run_compute_shader_glsl();
+  let program = compile_compute_shader(include_bytes!("../resources/shader.comp")).unwrap();
+  let data = run_compute_shader(program, [0; 32 * 32], (32, 32, 1));
+
+  println!("{data:?} {}", data.iter().sum::<u32>());
+  println!("{}", data.iter().len());
 
   let mut fonts = macroquad_text::Fonts::default();
 

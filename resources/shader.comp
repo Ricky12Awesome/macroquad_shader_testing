@@ -1,13 +1,16 @@
 #version 460 core
 
-layout(local_size_x = 1, local_size_y = 1, local_size_z = 1) in;
+layout(local_size_x = 16, local_size_y = 16, local_size_z = 1) in;
 
 layout(std430, binding = 0) buffer Buf {
-  uint test;
+  uint test[];
 };
 
-void main() {
-  //uint pos = gl_GlobalInvocationID.x;
+shared uint total;
 
-  test += 1;
+void main() {
+  uvec2 pos = gl_GlobalInvocationID.xy;
+  uint index = pos.x + (pos.y * gl_WorkGroupSize.x);
+
+  test[index] += index;
 }
