@@ -1,0 +1,17 @@
+[package]
+name = "macroquad-shader-testing"
+version = "0.1.0"
+edition = "2021"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+macroquad = { version = "0.3", default-features = false }
+# I made a few changes that aren't published yet
+macroquad-text = { path = "../macroquad-text" }
+
+# So the application isn't extremely slow in debug mode
+[profile.dev]
+opt-level = 1
+overflow-checks = false
+debug = 2
